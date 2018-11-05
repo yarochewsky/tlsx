@@ -25,6 +25,7 @@ type ClientHello struct {
 	SupportedPoints  []uint8
 	OSCP             bool
 	ALPNs            []string
+	AllExtensions    []uint16
 }
 
 func (ch ClientHello) String() string {
@@ -164,6 +165,8 @@ func (ch *ClientHello) Unmarshall(payload []byte) error {
 
 		data := hs[4 : 4+length]
 		hs = hs[4+length:]
+
+		ch.AllExtensions = append(ch.AllExtensions, uint16(extType))
 
 		switch extType {
 		case ExtServerName:
