@@ -1,6 +1,15 @@
 # Introduction
 
-[![GoDoc](https://godoc.org/github.com/bradleyfalzon/tlsx?status.svg)](https://godoc.org/github.com/bradleyfalzon/tlsx)
+[![GoDoc](https://godoc.org/github.com/dreadl0ck/tlsx?status.svg)](https://godoc.org/github.com/dreadl0ck/tlsx)
+
+## IMPORTANT
+
+This is a fork of the **bradleyfalzon/tlsx** package,
+that stores TLS extensions in the order they were encountered during parsing.
+
+This is used to create JA3 hashes, for fingerprinting TLS client hellos in **github.com/dreadl0ck/ja3**.
+
+**Original Readme**
 
 `tlsx` was a private library I was using to analyse TLS Client Hello messages sent by browsers.
 
