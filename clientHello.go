@@ -1,6 +1,9 @@
 package tlsx
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 const (
 	ClientHelloRandomLen = 32
@@ -46,6 +49,10 @@ func (ch ClientHello) String() string {
 }
 
 func (ch *ClientHello) Unmarshall(payload []byte) error {
+
+	if len(payload) < 5 {
+		return errors.New("payload too short")
+	}
 	ch.Raw = payload
 	ch.Type = uint8(payload[0])
 	ch.Version = Version(payload[1])<<8 | Version(payload[2])
