@@ -14,33 +14,6 @@ const (
 // https://www.iana.org/assignments/tls-parameters/tls-parameters.xml#tls-parameters-8.
 type CurveID uint16
 
-type ServerHello struct {
-	Raw                          []byte
-	Vers                         uint16
-	Random                       []byte
-	SessionId                    []byte
-	CipherSuite                  uint16
-	CompressionMethod            uint8
-	NextProtoNeg                 bool
-	NextProtos                   []string
-	OcspStapling                 bool
-	Scts                         [][]byte
-	Ems                          bool
-	TicketSupported              bool
-	SecureRenegotiation          []byte
-	SecureRenegotiationSupported bool
-	AlpnProtocol                 string
-	Extensions []uint16
-
-	// 1.3
-	SupportedVersion        uint16
-	ServerShare             keyShare
-	SelectedIdentityPresent bool
-	SelectedIdentity        uint16
-	Cookie                  []byte  // HelloRetryRequest extension
-	SelectedGroup           CurveID // HelloRetryRequest extension
-}
-
 // TLS 1.3 Key Share. See RFC 8446, Section 4.2.8.
 type keyShare struct {
 	group CurveID
@@ -52,7 +25,6 @@ type keyShare struct {
 func readUint8LengthPrefixed(s *cryptobyte.String, out *[]byte) bool {
 	return s.ReadUint8LengthPrefixed((*cryptobyte.String)(out))
 }
-
 
 // readUint16LengthPrefixed acts like s.ReadUint16LengthPrefixed, but targets a
 // []byte instead of a cryptobyte.String.
@@ -82,91 +54,60 @@ const (
 	extensionRenegotiationInfo       uint16 = 0xff01
 )
 
-type serverHelloMsg struct {
-	raw                          []byte
-	vers                         uint16
-	random                       []byte
-	sessionId                    []byte
-	cipherSuite                  uint16
-	compressionMethod            uint8
-	nextProtoNeg                 bool
-	nextProtos                   []string
-	ocspStapling                 bool
-	ticketSupported              bool
-	secureRenegotiationSupported bool
-	secureRenegotiation          []byte
-	alpnProtocol                 string
-	ems                          bool
-	scts                         [][]byte
-	supportedVersion             uint16
-	serverShare                  keyShare
-	selectedIdentityPresent      bool
-	selectedIdentity             uint16
+type ServerHello struct {
+	Raw                          []byte
+	Vers                         uint16
+	Random                       []byte
+	SessionID                    []byte
+	CipherSuite                  uint16
+	CompressionMethod            uint8
+	NextProtoNeg                 bool
+	NextProtos                   []string
+	OCSPStapling                 bool
+	TicketSupported              bool
+	SecureRenegotiationSupported bool
+	SecureRenegotiation          []byte
+	AlpnProtocol                 string
+	Ems                          bool
+	Scts                         [][]byte
+	SupportedVersion             uint16
+	ServerShare                  keyShare
+	SelectedIdentityPresent      bool
+	SelectedIdentity             uint16
 
 	// HelloRetryRequest extensions
-	cookie        []byte
-	selectedGroup CurveID
+	Cookie        []byte
+	SelectedGroup CurveID
 
-	extensions []uint16
+	Extensions []uint16
 }
 
-func (msg *ServerHello) Unmarshall(buf []byte) error {
+func (m *ServerHello) Unmarshal(data []byte) error {
 
-	if len(buf) < 5+4 {
+	if len(data) < 5+4 {
 		return errors.New("Server returned short message")
 	}
 
 	// buf contains a TLS record, with a 5 byte record header and a 4 byte
 	// handshake header. The length of the ServerHello is taken from the
 	// handshake header.
-	serverHelloLen := int(buf[6])<<16 | int(buf[7])<<8 | int(buf[8])
+	serverHelloLen := int(data[6])<<16 | int(data[7])<<8 | int(data[8])
 
-	if serverHelloLen >= len(buf) {
+	if serverHelloLen >= len(data) {
 		return errors.New("invalid serverHelloLen")
 	}
 
-	var shm serverHelloMsg
-	if err := shm.unmarshal(buf[5 : 9+serverHelloLen]); err != nil {
-		return err
-	}
+	data = data[5 : 9+serverHelloLen]
 
-	msg.Raw =                          shm.raw
-	msg.Vers =                         shm.vers
-	msg.Random =                       shm.random
-	msg.SessionId =                    shm.sessionId
-	msg.CipherSuite =                  shm.cipherSuite
-	msg.CompressionMethod =            shm.compressionMethod
-	msg.NextProtoNeg =                 shm.nextProtoNeg
-	msg.NextProtos =                   shm.nextProtos
-	msg.OcspStapling =                 shm.ocspStapling
-	msg.Scts =                         shm.scts
-	msg.Ems =                          shm.ems
-	msg.TicketSupported =              shm.ticketSupported
-	msg.SecureRenegotiation =          shm.secureRenegotiation
-	msg.SecureRenegotiationSupported = shm.secureRenegotiationSupported
-	msg.AlpnProtocol =                 shm.alpnProtocol
-	msg.SupportedVersion =             shm.supportedVersion
-	msg.ServerShare =                  shm.serverShare
-	msg.SelectedIdentityPresent =      shm.selectedIdentityPresent
-	msg.SelectedIdentity =             shm.selectedIdentity
-	msg.Cookie =                       shm.cookie
-	msg.SelectedGroup =                shm.selectedGroup
-	msg.Extensions = shm.extensions
-
-	return nil
-}
-
-func (m *serverHelloMsg) unmarshal(data []byte) error {
-
-	*m = serverHelloMsg{raw: data}
+	*m = ServerHello{Raw: data}
 	s := cryptobyte.String(data)
 
 	if !s.Skip(4) || // message type and uint24 length field
-		!s.ReadUint16(&m.vers) || !s.ReadBytes(&m.random, 32) ||
-		!readUint8LengthPrefixed(&s, &m.sessionId) ||
-		!s.ReadUint16(&m.cipherSuite) ||
-		!s.ReadUint8(&m.compressionMethod) {
-		if m.vers == 772 {
+		!s.ReadUint16(&m.Vers) || !s.ReadBytes(&m.Random, 32) ||
+		!readUint8LengthPrefixed(&s, &m.SessionID) ||
+		!s.ReadUint16(&m.CipherSuite) ||
+		!s.ReadUint8(&m.CompressionMethod) {
+		if m.Vers == 772 {
 			fmt.Println("TLS 1.3 !!!")
 		}
 		return errors.New("invalid message type")
@@ -190,28 +131,28 @@ func (m *serverHelloMsg) unmarshal(data []byte) error {
 			return errors.New("failed to read extension data")
 		}
 
-		m.extensions = append(m.extensions, extension)
+		m.Extensions = append(m.Extensions, extension)
 
 		switch extension {
 		case extensionNextProtoNeg:
-			m.nextProtoNeg = true
+			m.NextProtoNeg = true
 			for !extData.Empty() {
 				var proto cryptobyte.String
 				if !extData.ReadUint8LengthPrefixed(&proto) ||
 					proto.Empty() {
 					return errors.New("failed to read extensionNextProtoNeg")
 				}
-				m.nextProtos = append(m.nextProtos, string(proto))
+				m.NextProtos = append(m.NextProtos, string(proto))
 			}
 		case extensionStatusRequest:
-			m.ocspStapling = true
+			m.OCSPStapling = true
 		case extensionSessionTicket:
-			m.ticketSupported = true
+			m.TicketSupported = true
 		case extensionRenegotiationInfo:
-			if !readUint8LengthPrefixed(&extData, &m.secureRenegotiation) {
+			if !readUint8LengthPrefixed(&extData, &m.SecureRenegotiation) {
 				return errors.New("failed to read extensionRenegotiationInfo")
 			}
-			m.secureRenegotiationSupported = true
+			m.SecureRenegotiationSupported = true
 		case extensionALPN:
 			var protoList cryptobyte.String
 			if !extData.ReadUint16LengthPrefixed(&protoList) || protoList.Empty() {
@@ -222,7 +163,7 @@ func (m *serverHelloMsg) unmarshal(data []byte) error {
 				proto.Empty() || !protoList.Empty() {
 				return errors.New("failed to read extensionRenegotiationInfo proto")
 			}
-			m.alpnProtocol = string(proto)
+			m.AlpnProtocol = string(proto)
 		case extensionSCT:
 			var sctList cryptobyte.String
 			if !extData.ReadUint16LengthPrefixed(&sctList) || sctList.Empty() {
@@ -234,33 +175,33 @@ func (m *serverHelloMsg) unmarshal(data []byte) error {
 					len(sct) == 0 {
 					return errors.New("failed to read extensionSCT sctList sct")
 				}
-				m.scts = append(m.scts, sct)
+				m.Scts = append(m.Scts, sct)
 			}
 		case extensionSupportedVersions:
-			if !extData.ReadUint16(&m.supportedVersion) {
+			if !extData.ReadUint16(&m.SupportedVersion) {
 				return errors.New("failed to read extensionSupportedVersions")
 			}
 		case extensionCookie:
-			if !readUint16LengthPrefixed(&extData, &m.cookie) ||
-				len(m.cookie) == 0 {
+			if !readUint16LengthPrefixed(&extData, &m.Cookie) ||
+				len(m.Cookie) == 0 {
 				return errors.New("failed to read extensionCookie")
 			}
 		case extensionKeyShare:
 			// This extension has different formats in SH and HRR, accept either
 			// and let the handshake logic decide. See RFC 8446, Section 4.2.8.
 			if len(extData) == 2 {
-				if !extData.ReadUint16((*uint16)(&m.selectedGroup)) {
+				if !extData.ReadUint16((*uint16)(&m.SelectedGroup)) {
 					return errors.New("failed to read extensionKeyShare")
 				}
 			} else {
-				if !extData.ReadUint16((*uint16)(&m.serverShare.group)) ||
-					!readUint16LengthPrefixed(&extData, &m.serverShare.data) {
+				if !extData.ReadUint16((*uint16)(&m.ServerShare.group)) ||
+					!readUint16LengthPrefixed(&extData, &m.ServerShare.data) {
 					return errors.New("failed to read extensionKeyShare")
 				}
 			}
 		case extensionPreSharedKey:
-			m.selectedIdentityPresent = true
-			if !extData.ReadUint16(&m.selectedIdentity) {
+			m.SelectedIdentityPresent = true
+			if !extData.ReadUint16(&m.SelectedIdentity) {
 				return errors.New("failed to read extensionPreSharedKey")
 			}
 		default:
@@ -276,19 +217,30 @@ func (m *serverHelloMsg) unmarshal(data []byte) error {
 	return nil
 }
 
-//func (ch ServerHello) String() string {
-//	str := fmt.Sprintln("Version:", ch.Version)
-//	str += fmt.Sprintln("Handshake Type:", ch.HandshakeType)
-//	str += fmt.Sprintln("Handshake Version:", ch.HandshakeVersion)
-//	str += fmt.Sprintf("SessionID: %#v\n", ch.SessionID)
-//	str += fmt.Sprintf("Cipher Suites (%d): %v\n", ch.CipherSuiteLen, ch.CipherSuites)
-//	str += fmt.Sprintf("Compression Methods: %v\n", ch.CompressMethods)
-//	str += fmt.Sprintln("Extensions:", ch.Extensions)
-//	str += fmt.Sprintf("SNI: %q\n", ch.SNI)
-//	str += fmt.Sprintf("Signature Algorithms: %#v\n", ch.SignatureAlgs)
-//	str += fmt.Sprintf("Groups: %#v\n", ch.SupportedGroups)
-//	str += fmt.Sprintf("Points: %#v\n", ch.SupportedPoints)
-//	str += fmt.Sprintf("OSCP: %v\n", ch.OSCP)
-//	str += fmt.Sprintf("ALPNs: %v", ch.ALPNs)
-//	return str
-//}
+func (ch ServerHello) String() string {
+
+	str := fmt.Sprintln("Raw:", ch.Raw)
+	str += fmt.Sprintln("Version:", ch.Vers)
+	str += fmt.Sprintln("Random:", ch.Random)
+	str += fmt.Sprintf("SessionId: %#v\n", ch.SessionID)
+	str += fmt.Sprintf("CipherSuite (%d): %v\n", 1, ch.CipherSuite)
+	str += fmt.Sprintf("CompressionMethod: %v\n", ch.CompressionMethod)
+	str += fmt.Sprintln("NextProtoNeg:", ch.NextProtoNeg)
+	str += fmt.Sprintf("NextProtos: %q\n", ch.NextProtos)
+	str += fmt.Sprintf("OcspStapling: %#v\n", ch.OCSPStapling)
+	str += fmt.Sprintf("Scts: %#v\n", ch.Scts)
+	str += fmt.Sprintf("Ems: %#v\n", ch.Ems)
+	str += fmt.Sprintf("TicketSupported: %v\n", ch.TicketSupported)
+	str += fmt.Sprintf("SecureRenegotiation: %v\n", ch.SecureRenegotiation)
+	str += fmt.Sprintf("SecureRenegotiationSupported: %v\n", ch.SecureRenegotiationSupported)
+	str += fmt.Sprintf("AlpnProtocol: %v\n", ch.AlpnProtocol)
+	str += fmt.Sprintf("Extensions: %v\n", ch.Extensions)
+	str += fmt.Sprintf("SupportedVersion: %v\n", ch.SupportedVersion)
+	str += fmt.Sprintf("ServerShare: %v\n", ch.ServerShare)
+	str += fmt.Sprintf("SelectedIdentityPresent: %v\n", ch.SelectedIdentityPresent)
+	str += fmt.Sprintf("SelectedIdentity: %v\n", ch.SelectedIdentity)
+	str += fmt.Sprintf("Cookie: %v\n", ch.Cookie)
+	str += fmt.Sprintf("SelectedGroup: %v\n", ch.SelectedGroup)
+
+	return str
+}

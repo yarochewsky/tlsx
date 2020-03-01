@@ -4,9 +4,6 @@ import "errors"
 
 const (
 	SNINameTypeDNS uint8 = 0
-)
-
-const (
 	OCSPStatusRequest uint8 = 1
 )
 

@@ -48,7 +48,7 @@ func (ch ClientHello) String() string {
 	return str
 }
 
-func (ch *ClientHello) Unmarshall(payload []byte) error {
+func (ch *ClientHello) Unmarshal(payload []byte) error {
 
 	if len(payload) < 5 {
 		return errors.New("payload too short")
@@ -82,7 +82,7 @@ func (ch *ClientHello) Unmarshall(payload []byte) error {
 		return ErrHandshakeBadLength
 	}
 
-	// Get random data
+	// Get Random data
 	ch.Random = hs[:ClientHelloRandomLen]
 
 	hs = hs[ClientHelloRandomLen:]
