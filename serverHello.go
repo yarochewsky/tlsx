@@ -107,9 +107,6 @@ func (m *ServerHello) Unmarshal(data []byte) error {
 		!readUint8LengthPrefixed(&s, &m.SessionID) ||
 		!s.ReadUint16(&m.CipherSuite) ||
 		!s.ReadUint8(&m.CompressionMethod) {
-		if m.Vers == 772 {
-			fmt.Println("TLS 1.3 !!!")
-		}
 		return errors.New("invalid message type")
 	}
 
@@ -212,6 +209,60 @@ func (m *ServerHello) Unmarshal(data []byte) error {
 		if !extData.Empty() {
 			return errors.New("failed to read extension data")
 		}
+	}
+
+	return nil
+}
+
+// UnmarshalMinimal only parses the fields needed for JA3 fingerprinting
+// to avoids unnecessary allocations
+func (m *ServerHello) UnmarshalMinimal(data []byte) error {
+
+	if len(data) < 5+4 {
+		return errors.New("Server returned short message")
+	}
+
+	// buf contains a TLS record, with a 5 byte record header and a 4 byte
+	// handshake header. The length of the ServerHello is taken from the
+	// handshake header.
+	serverHelloLen := int(data[6])<<16 | int(data[7])<<8 | int(data[8])
+
+	if serverHelloLen >= len(data) {
+		return errors.New("invalid serverHelloLen")
+	}
+
+	data = data[5 : 9+serverHelloLen]
+
+	*m = ServerHello{Raw: data}
+	s := cryptobyte.String(data)
+
+	if !s.Skip(4) || // message type and uint24 length field
+		!s.ReadUint16(&m.Vers) || !s.ReadBytes(&m.Random, 32) ||
+		!readUint8LengthPrefixed(&s, &m.SessionID) ||
+		!s.ReadUint16(&m.CipherSuite) ||
+		!s.ReadUint8(&m.CompressionMethod) {
+		return errors.New("invalid message type")
+	}
+
+	if s.Empty() {
+		// ServerHello is optionally followed by extension data
+		return nil
+	}
+
+	var extensions cryptobyte.String
+	if !s.ReadUint16LengthPrefixed(&extensions) || !s.Empty() {
+		return errors.New("failed to read extensions")
+	}
+
+	for !extensions.Empty() {
+		var extension uint16
+		var extData cryptobyte.String
+		if !extensions.ReadUint16(&extension) ||
+			!extensions.ReadUint16LengthPrefixed(&extData) {
+			return errors.New("failed to read extension data")
+		}
+
+		m.Extensions = append(m.Extensions, extension)
 	}
 
 	return nil

@@ -2,81 +2,65 @@
 
 [![GoDoc](https://godoc.org/github.com/dreadl0ck/tlsx?status.svg)](https://godoc.org/github.com/dreadl0ck/tlsx)
 
-## IMPORTANT
-
 This is a fork of the **bradleyfalzon/tlsx** package,
-that stores TLS extensions in the order they were encountered during parsing.
+that was updated to store TLS extensions in the client hello message in the order they were encountered during parsing.
+It was further extended with unit tests, benchmarks and parsing code to extract the TLS server hello message.
 
-This is used to create JA3 hashes, for fingerprinting TLS client hellos in **github.com/dreadl0ck/ja3**.
+This package is used to create JA3 hashes, for fingerprinting TLS client and server hellos in **github.com/dreadl0ck/ja3**.
+Since not all values produced by parsing the hello messages are required to calculate the fingerprint,
+two variations of the Unmarshal function are provided for both client and server: *Unmarshal()* and *UnmarshalMinimal()*.
+The minimal unmarshal will only parse the raw values without populating the entire structs, and therefore are slightly faster.
 
-**Original Readme**
+## API
 
-`tlsx` was a private library I was using to analyse TLS Client Hello messages sent by browsers.
+    package tlsx // import "github.com/dreadl0ck/tlsx"
+    
+    const SNINameTypeDNS uint8 = 0 ...
+    const ClientHelloRandomLen = 32
+    const ServerHelloRandomLen = 32
+    var ErrHandshakeWrongType = errors.New("handshake is of wrong type, or not a handshake message") ...
+    var CipherSuiteReg = map[CipherSuite]string{ ... }
+    var ExtensionReg = map[Extension]string{ ... }
+    var VersionReg = map[Version]string{ ... }
+    type CipherSuite uint16
+    type ClientHello struct{ ... }
+        func GetClientHello(packet gopacket.Packet) *ClientHello
+        func GetClientHelloMinimal(packet gopacket.Packet) *ClientHello
+    type CurveID uint16
+    type Extension uint16
+        const ExtServerName Extension = 0 ...
+    type ServerHello struct{ ... }
+        func GetServerHello(packet gopacket.Packet) *ServerHello
+        func GetServerHelloMinimal(packet gopacket.Packet) *ServerHello
+    type TLSMessage struct{ ... }
+    type Version uint16
+        const VerSSL30 Version = 0x300 ...
 
-I didn't continue to the project, but others asked about it, so I thought I'd open source it without warranty.
+## Tests and Benchmarks
 
-The library requires the TCP payload of a TLS Client Hello message, which can be provided by
-(gopacket)[https://github.com/google/gopacket] (see example).
+Benchmarks:
 
-*This program is not used internally by myself anymore, and may not have an updated list of ciphers, extensions etc. But
-it may work for you. It was written when I was first learning Go, and there's no tests.*
+    $ go test -bench=.
+    goos: darwin
+    goarch: amd64
+    pkg: github.com/dreadl0ck/tlsx
+    BenchmarkGetClientHello-12           	 1380427	       899 ns/op	     688 B/op	      16 allocs/op
+    BenchmarkGetClientHelloMinimal-12    	 2741461	       438 ns/op	     488 B/op	       8 allocs/op
+    BenchmarkGetServerHello-12           	 4232562	       278 ns/op	     336 B/op	       3 allocs/op
+    BenchmarkGetServerHelloMinimal-12    	 4691030	       234 ns/op	     328 B/op	       2 allocs/op
+    PASS
+    ok  	github.com/dreadl0ck/tlsx	6.673s
 
-# Example usage
+Tests:
 
-Run an example program, which listens on an interface for inbound or outbound packets on port 443.
-
-```
-cd example; go build; sudo ./example -iface br0
-```
-
-Make a connection:
-
-```
-curl https://www.google.com.au
-```
-
-Review the output:
-
-```
-2017/06/24 21:30:48 Client hello from port 37066 to 443(https)
-Version: TLS 1.0
-Handshake Type: 1
-Handshake Version: TLS 1.2
-SessionID: []byte(nil)
-Cipher Suites (54): [TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384 TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA
-TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
-TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA
-TLS_DHE_RSA_WITH_AES_256_GCM_SHA384 TLS_DHE_RSA_WITH_AES_256_CBC_SHA TLS_DHE_DSS_WITH_AES_256_CBC_SHA
-TLS_DHE_RSA_WITH_AES_256_CBC_SHA256 TLS_DHE_RSA_WITH_AES_128_GCM_SHA256 TLS_DHE_RSA_WITH_AES_128_CBC_SHA
-TLS_DHE_DSS_WITH_AES_128_CBC_SHA TLS_DHE_RSA_WITH_AES_128_CBC_SHA256 TLS_DHE_RSA_WITH_3DES_EDE_CBC_SHA
-TLS_DHE_DSS_WITH_3DES_EDE_CBC_SHA TLS_RSA_WITH_AES_256_GCM_SHA384 TLS_RSA_WITH_AES_256_CBC_SHA
-TLS_RSA_WITH_AES_256_CBC_SHA256 TLS_RSA_WITH_AES_128_GCM_SHA256 TLS_RSA_WITH_AES_128_CBC_SHA
-TLS_RSA_WITH_AES_128_CBC_SHA256 TLS_RSA_WITH_3DES_EDE_CBC_SHA TLS_RSA_WITH_RC4_128_SHA TLS_RSA_WITH_RC4_128_MD5]
-Compression Methods: [0]
-Extensions: map[renegotiation_info:1]
-SNI: "google.com.au"
-Signature Algorithms: []uint16{0x403, 0x503, 0x603, 0x203, 0x401, 0x501, 0x601, 0x201, 0x402, 0x502, 0x602, 0x202}
-Groups: []uint16{0x17, 0x18, 0x19}
-Points: []byte{0x0}
-OSCP: false
-ALPNs: []
-```
-
-Chrome example:
-
-```
-2017/06/24 21:26:32 Client hello from port 61746 to 443(https)
-Version: TLS 1.0
-Handshake Type: 1
-Handshake Version: TLS 1.2
-SessionID: []byte(nil)
-Cipher Suites (32): [0x8a8a (unknown) TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384 TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384 0xcca9 (unknown) 0xcca8 (unknown) 0xcc14 (unknown) 0xcc13 (unknown) TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA TLS_RSA_WITH_AES_128_GCM_SHA256 TLS_RSA_WITH_AES_256_GCM_SHA384 TLS_RSA_WITH_AES_128_CBC_SHA TLS_RSA_WITH_AES_256_CBC_SHA TLS_RSA_WITH_3DES_EDE_CBC_SHA]
-Compression Methods: [0]
-Extensions: map[0x7550 (unknown):0 0x7a7a (unknown):1 0xfafa (unknown):0 renegotiation_info:1 extended_master_secret:0 SessionTicket TLS:0 signed_certificate_timestamp:0]
-SNI: "example.com"
-Signature Algorithms: []uint16{0x403, 0x804, 0x401, 0x503, 0x805, 0x501, 0x806, 0x601, 0x201}
-Groups: []uint16{0x6a6a, 0x1d, 0x17, 0x18}
-Points: []byte{0x0}
-OSCP: true
-ALPNs: [h2 http/1.1]
-```
+    $ go test -v
+    === RUN   TestClientHello
+    --- PASS: TestClientHello (0.00s)
+    === RUN   TestClientHelloMinimal
+    --- PASS: TestClientHelloMinimal (0.00s)
+    === RUN   TestServerHello
+    --- PASS: TestServerHello (0.00s)
+    === RUN   TestGetServerHelloMinimal
+    --- PASS: TestGetServerHelloMinimal (0.00s)
+    PASS
+    ok  	github.com/dreadl0ck/tlsx	0.067s
