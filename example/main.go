@@ -4,11 +4,12 @@ import (
 	//"encoding/hex"
 	"flag"
 	"fmt"
-	"github.com/google/gopacket/layers"
-	"github.com/google/gopacket/pcap"
 	"github.com/dreadl0ck/tlsx"
 	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
+	"github.com/google/gopacket/pcap"
 	"log"
+	"os"
 )
 
 func main() {
@@ -21,6 +22,10 @@ func main() {
 
 	flag.Parse()
 
+	// redirect to stdout (log pkg logs to stderr by default)
+	// to allow grepping the result through a simple pipe
+	log.SetOutput(os.Stdout)
+
 	var (
 		handle *pcap.Handle
 		err error
@@ -29,6 +34,7 @@ func main() {
 	if *flagPcap != "" {
 		handle, err = pcap.OpenOffline(*flagPcap)
 	} else {
+		// snapLen = 1514 (1500 Ethernet MTU + 14 byte Ethernet Header)
 		handle, err = pcap.OpenLive(*flagInterface, 1514, false, pcap.BlockForever)
 	}
 	if err != nil {
@@ -41,8 +47,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
+	// create packet source
 	fmt.Println("Listening on", *flagInterface)
+	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
+
+	// handle packets
 	for packet := range packetSource.Packets() {
 		go readPacket(packet)
 	}
@@ -50,13 +59,13 @@ func main() {
 
 func readPacket(packet gopacket.Packet) {
 	if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
+
+		// cast TCP layer
 		tcp, ok := tcpLayer.(*layers.TCP)
 		if !ok {
 			log.Println("Could not decode TCP layer")
 			return
 		}
-
-		//fmt.Println(tcp.ACK, tcp.Seq)
 
 		if tcp.SYN {
 			// Connection setup
@@ -69,18 +78,18 @@ func readPacket(packet gopacket.Packet) {
 		} else {
 			// data packet
 
-			// TLS client hello
+			// process TLS client hello
 			clientHello := tlsx.GetClientHello(packet)
 			if clientHello != nil {
 				destination := "[" + packet.NetworkLayer().NetworkFlow().Dst().String() + ":"+ packet.TransportLayer().TransportFlow().Dst().String() + "]"
 				log.Printf("%s Client hello from port %s to %s", destination, tcp.SrcPort, tcp.DstPort)
 			}
 
-			// TLS server hello
+			// process TLS server hello
 			serverHello := tlsx.GetServerHello(packet)
 			if serverHello != nil {
 				destination := "[" + packet.NetworkLayer().NetworkFlow().Dst().String() + ":"+ packet.TransportLayer().TransportFlow().Dst().String() + "]"
-				log.Printf("%s Client hello from port %s to %s", destination, tcp.SrcPort, tcp.DstPort)
+				log.Printf("%s Server hello from port %s to %s", destination, tcp.SrcPort, tcp.DstPort)
 			}
 		}
 	}
