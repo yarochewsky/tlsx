@@ -14,7 +14,7 @@ var (
 )
 
 type TLSMessage struct {
-	Raw        []byte
+	//Raw        []byte
 	Type       uint8
 	Version    Version
 	MessageLen uint16

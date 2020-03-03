@@ -52,7 +52,7 @@ func (ch *ClientHello) Unmarshal(payload []byte) error {
 	if len(payload) < 6 {
 		return ErrHandshakeBadLength
 	}
-	ch.Raw = payload
+
 	ch.Type = uint8(payload[0])
 	ch.Version = Version(payload[1])<<8 | Version(payload[2])
 	ch.MessageLen = uint16(payload[3])<<8 | uint16(payload[4])
@@ -62,7 +62,6 @@ func (ch *ClientHello) Unmarshal(payload []byte) error {
 	}
 
 	hs := payload[5:]
-
 	if len(hs) < 6 {
 		return ErrHandshakeBadLength
 	}
@@ -76,7 +75,6 @@ func (ch *ClientHello) Unmarshal(payload []byte) error {
 	ch.HandshakeVersion = Version(hs[4])<<8 | Version(hs[5])
 
 	hs = hs[6:]
-
 	if len(hs) < ClientHelloRandomLen {
 		return ErrHandshakeBadLength
 	}
@@ -85,7 +83,6 @@ func (ch *ClientHello) Unmarshal(payload []byte) error {
 	ch.Random = hs[:ClientHelloRandomLen]
 
 	hs = hs[ClientHelloRandomLen:]
-
 	if len(hs) < 1 {
 		return ErrHandshakeBadLength
 	}
@@ -103,7 +100,6 @@ func (ch *ClientHello) Unmarshal(payload []byte) error {
 	}
 
 	hs = hs[ch.SessionIDLen:]
-
 	if len(hs) < 2 {
 		return ErrHandshakeBadLength
 	}
@@ -112,7 +108,6 @@ func (ch *ClientHello) Unmarshal(payload []byte) error {
 	ch.CipherSuiteLen = uint16(hs[0])<<8 | uint16(hs[1])
 
 	numCiphers := ch.CipherSuiteLen / 2
-
 	if len(hs) < int(ch.CipherSuiteLen) {
 		return ErrHandshakeBadLength
 	}
@@ -123,14 +118,12 @@ func (ch *ClientHello) Unmarshal(payload []byte) error {
 	}
 
 	hs = hs[2+ch.CipherSuiteLen:]
-
 	if len(hs) < 1 {
 		return ErrHandshakeBadLength
 	}
 
 	// Compression Methods
 	numCompressMethods := int(hs[0])
-
 	if len(hs) < 1+numCompressMethods {
 		return ErrHandshakeBadLength
 	}
@@ -141,10 +134,9 @@ func (ch *ClientHello) Unmarshal(payload []byte) error {
 	}
 
 	hs = hs[1+numCompressMethods:]
-
 	if len(hs) < 2 {
 		// No extensions or malformed length
-		return ErrHandshakeBadLength
+		return nil
 	}
 
 	// Extensions
@@ -190,14 +182,12 @@ func (ch *ClientHello) Unmarshal(payload []byte) error {
 
 			for len(data) > 0 {
 				nameType := data[0]
-
 				if len(data) < 3 {
 					// Malformed ServerName
 					return ErrHandshakeExtBadLength
 				}
 
 				nameLen := int(data[1])<<8 | int(data[2])
-
 				data = data[3:]
 
 				switch nameType {
@@ -215,7 +205,6 @@ func (ch *ClientHello) Unmarshal(payload []byte) error {
 			sigLen := int(data[0])<<8 | int(data[1])
 
 			data = data[2:]
-
 			if len(data) < sigLen {
 				return ErrHandshakeExtBadLength
 			}
@@ -232,7 +221,6 @@ func (ch *ClientHello) Unmarshal(payload []byte) error {
 			groupLen := int(data[0])<<8 | int(data[1])
 
 			data = data[2:]
-
 			if len(data) < groupLen {
 				// Malformed length
 				return ErrHandshakeExtBadLength
@@ -249,7 +237,6 @@ func (ch *ClientHello) Unmarshal(payload []byte) error {
 			pointLen := int(data[0])
 
 			data = data[1:]
-
 			if len(data) < pointLen {
 				return ErrHandshakeExtBadLength
 			}
@@ -297,44 +284,64 @@ func (ch *ClientHello) Unmarshal(payload []byte) error {
 	return nil
 }
 
-// UnmarshalMinimal only parses the fields needed for JA3 fingerprinting
+type ClientHelloBasic struct {
+	TLSMessage
+	HandshakeType    uint8
+	HandshakeLen     uint32
+	HandshakeVersion Version
+	SessionIDLen     uint32
+	CipherSuiteLen   uint16
+	CipherSuites     []CipherSuite
+	ExtensionLen     uint16
+	SNI              string
+	SupportedGroups  []uint16
+	SupportedPoints  []uint8
+	AllExtensions    []uint16
+}
+
+func (ch ClientHelloBasic) String() string {
+	str := fmt.Sprintln("Version:", ch.Version)
+	str += fmt.Sprintln("Handshake Type:", ch.HandshakeType)
+	str += fmt.Sprintln("Handshake Version:", ch.HandshakeVersion)
+	str += fmt.Sprintf("Cipher Suites (%d): %v\n", ch.CipherSuiteLen, ch.CipherSuites)
+	str += fmt.Sprintf("SNI: %q\n", ch.SNI)
+	str += fmt.Sprintf("Groups: %#v\n", ch.SupportedGroups)
+	str += fmt.Sprintf("Points: %#v\n", ch.SupportedPoints)
+	return str
+}
+
+// UnmarshalBasic only parses the fields needed for JA3 fingerprinting
 // to avoids unnecessary allocations
-func (ch *ClientHello) UnmarshalMinimal(payload []byte) error {
+func (ch *ClientHelloBasic) Unmarshal(payload []byte) error {
 
 	if len(payload) < 6 {
 		return ErrHandshakeBadLength
 	}
-	//ch.Raw = payload
+
 	ch.Type = uint8(payload[0])
 	ch.Version = Version(payload[1])<<8 | Version(payload[2])
-	//ch.MessageLen = uint16(payload[3])<<8 | uint16(payload[4])
 
 	if ch.Type != uint8(22) {
 		return ErrHandshakeWrongType
 	}
 
 	hs := payload[5:]
-
 	if len(hs) < 6 {
 		return ErrHandshakeBadLength
 	}
 
 	ch.HandshakeType = uint8(hs[0])
-
 	if ch.HandshakeType != 1 {
 		return ErrHandshakeWrongType
 	}
-	//ch.HandshakeLen = uint32(hs[1])<<16 | uint32(hs[2])<<8 | uint32(hs[3])
 	ch.HandshakeVersion = Version(hs[4])<<8 | Version(hs[5])
 
 	hs = hs[6:]
-
 	if len(hs) < ClientHelloRandomLen {
 		return ErrHandshakeBadLength
 	}
 
 	hs = hs[ClientHelloRandomLen:]
-
 	if len(hs) < 1 {
 		return ErrHandshakeBadLength
 	}
@@ -347,12 +354,7 @@ func (ch *ClientHello) UnmarshalMinimal(payload []byte) error {
 		return ErrHandshakeBadLength
 	}
 
-	if ch.SessionIDLen != 0 {
-		ch.SessionID = hs[:ch.SessionIDLen]
-	}
-
 	hs = hs[ch.SessionIDLen:]
-
 	if len(hs) < 2 {
 		return ErrHandshakeBadLength
 	}
@@ -361,7 +363,6 @@ func (ch *ClientHello) UnmarshalMinimal(payload []byte) error {
 	ch.CipherSuiteLen = uint16(hs[0])<<8 | uint16(hs[1])
 
 	numCiphers := ch.CipherSuiteLen / 2
-
 	if len(hs) < int(ch.CipherSuiteLen) {
 		return ErrHandshakeBadLength
 	}
@@ -373,34 +374,29 @@ func (ch *ClientHello) UnmarshalMinimal(payload []byte) error {
 	}
 
 	hs = hs[2+ch.CipherSuiteLen:]
-
 	if len(hs) < 1 {
 		return ErrHandshakeBadLength
 	}
 
 	// Compression Methods
 	numCompressMethods := int(hs[0])
-
 	if len(hs) < 1+numCompressMethods {
 		return ErrHandshakeBadLength
 	}
 
 	hs = hs[1+numCompressMethods:]
-
 	if len(hs) < 2 {
 		// No extensions or malformed length
-		return ErrHandshakeBadLength
+		return nil
 	}
 
 	// Extensions
 	ch.ExtensionLen = uint16(hs[0])<<8 | uint16(hs[1])
-
 	if len(hs) < int(ch.ExtensionLen) {
 		return ErrHandshakeExtBadLength
 	}
 
 	hs = hs[2:]
-
 	for len(hs) > 0 {
 		if len(hs) < 4 {
 			return ErrHandshakeExtBadLength
@@ -443,7 +439,6 @@ func (ch *ClientHello) UnmarshalMinimal(payload []byte) error {
 				nameLen := int(data[1])<<8 | int(data[2])
 
 				data = data[3:]
-
 				switch nameType {
 				case SNINameTypeDNS:
 					ch.SNI = string(data)
@@ -459,7 +454,6 @@ func (ch *ClientHello) UnmarshalMinimal(payload []byte) error {
 			groupLen := int(data[0])<<8 | int(data[1])
 
 			data = data[2:]
-
 			if len(data) < groupLen {
 				// Malformed length
 				return ErrHandshakeExtBadLength
@@ -476,7 +470,6 @@ func (ch *ClientHello) UnmarshalMinimal(payload []byte) error {
 			pointLen := int(data[0])
 
 			data = data[1:]
-
 			if len(data) < pointLen {
 				return ErrHandshakeExtBadLength
 			}
@@ -487,7 +480,6 @@ func (ch *ClientHello) UnmarshalMinimal(payload []byte) error {
 			}
 		default:
 		}
-
 	}
 
 	return nil
