@@ -1,8 +1,8 @@
 package tlsx
 
 import (
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
+	"github.com/dreadl0ck/gopacket"
+	"github.com/dreadl0ck/gopacket/layers"
 )
 
 // GetServerHello returns a server hello message if the gopacket contains one

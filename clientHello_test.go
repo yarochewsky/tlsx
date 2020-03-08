@@ -2,9 +2,10 @@ package tlsx
 
 import (
 	"encoding/hex"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
 	"testing"
+
+	"github.com/dreadl0ck/gopacket"
+	"github.com/dreadl0ck/gopacket/layers"
 )
 
 func TestClientHello(t *testing.T) {
