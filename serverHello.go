@@ -255,7 +255,7 @@ type ServerHelloBasic struct {
 func (m *ServerHelloBasic) Unmarshal(data []byte) error {
 
 	if len(data) < 5+4 {
-		return errors.New("Server returned short message")
+		return errors.New("server returned short message")
 	}
 
 	// buf contains a TLS record, with a 5 byte record header and a 4 byte
@@ -267,6 +267,10 @@ func (m *ServerHelloBasic) Unmarshal(data []byte) error {
 		return errors.New("invalid serverHelloLen")
 	}
 
+	// slice bounds out of range [:19] with capacity 11
+	if len(data) < 9+serverHelloLen {
+		return errors.New("invalid data length for server hello")
+	}
 	data = data[5 : 9+serverHelloLen]
 
 	*m = ServerHelloBasic{}
