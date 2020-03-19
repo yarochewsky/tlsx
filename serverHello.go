@@ -96,6 +96,11 @@ func (m *ServerHello) Unmarshal(data []byte) error {
 		return errors.New("invalid serverHelloLen")
 	}
 
+	// prevent slice bounds out of range [:19] with capacity 11
+	if len(data) < 9+serverHelloLen {
+		return errors.New("invalid data length for server hello")
+	}
+
 	data = data[5 : 9+serverHelloLen]
 
 	*m = ServerHello{}
@@ -267,7 +272,7 @@ func (m *ServerHelloBasic) Unmarshal(data []byte) error {
 		return errors.New("invalid serverHelloLen")
 	}
 
-	// slice bounds out of range [:19] with capacity 11
+	// prevent slice bounds out of range [:19] with capacity 11
 	if len(data) < 9+serverHelloLen {
 		return errors.New("invalid data length for server hello")
 	}
