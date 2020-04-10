@@ -55,11 +55,8 @@ const (
 )
 
 type ServerHello struct {
-	Vers                         uint16
-	Random                       []byte
-	SessionID                    []byte
-	CipherSuite                  uint16
-	CompressionMethod            uint8
+	ServerHelloBasic
+
 	NextProtoNeg                 bool
 	NextProtos                   []string
 	OCSPStapling                 bool
@@ -76,9 +73,6 @@ type ServerHello struct {
 
 	// HelloRetryRequest extensions
 	Cookie        []byte
-	SelectedGroup CurveID
-
-	Extensions []uint16
 }
 
 func (m *ServerHello) Unmarshal(data []byte) error {
