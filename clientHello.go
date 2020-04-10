@@ -10,24 +10,15 @@ const (
 
 type ClientHello struct {
 	TLSMessage
-	HandshakeType    uint8
-	HandshakeLen     uint32
-	HandshakeVersion Version
+	ClientHelloBasic
+
 	Random           []byte
-	SessionIDLen     uint32
 	SessionID        []byte
-	CipherSuiteLen   uint16
-	CipherSuites     []CipherSuite
 	CompressMethods  []uint8
-	ExtensionLen     uint16
 	Extensions       map[Extension]uint16 // [Type]Length
-	SNI              string
 	SignatureAlgs    []uint16
-	SupportedGroups  []uint16
-	SupportedPoints  []uint8
 	OSCP             bool
 	ALPNs            []string
-	AllExtensions    []uint16
 }
 
 func (ch ClientHello) String() string {
