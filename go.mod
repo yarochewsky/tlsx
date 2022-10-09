@@ -1,4 +1,4 @@
-module github.com/dreadl0ck/tlsx
+module github.com/yarochewsky/tlsx
 
 go 1.14
 
