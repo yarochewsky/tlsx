@@ -51,7 +51,7 @@ The basic datatype contains less fields and does less parsing, which makes it fa
     --- PASS: TestGetServerHelloBasic (0.00s)
     goos: darwin
     goarch: amd64
-    pkg: github.com/dreadl0ck/tlsx
+    pkg: github.com/yarochewsky/tlsx
     BenchmarkGetClientHello
     BenchmarkGetClientHello-12         	 1000000	      1090 ns/op	     656 B/op	      16 allocs/op
     BenchmarkGetClientHelloBasic
@@ -61,4 +61,4 @@ The basic datatype contains less fields and does less parsing, which makes it fa
     BenchmarkGetServerHelloBasic
     BenchmarkGetServerHelloBasic-12    	 5287196	       223 ns/op	     104 B/op	       2 allocs/op
     PASS
-    ok  	github.com/dreadl0ck/tlsx	5.834s
+    ok  	github.com/yarochewsky/tlsx	5.834s
